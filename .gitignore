@@ -18,6 +18,7 @@
 !/models/*
 !.gitmodules
 !README.org
+!CMakeFunctions.txt
 !CMakeLists.txt
 !Doxyfile
 !todo.org
