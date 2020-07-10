@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 ###### Date:   27/01/2020
 ###### Brief: This CmakeLists.txt file enable to build generic project with the following structure:
 ######                                +---------+
-######                                | porject |
+######                                | project |
 ######                                +----+----+
 ######                                     |
 ######            +----------+------------++-------------+-----------+
@@ -54,7 +54,7 @@ set(MAIN_FILE "src/main.cpp")
 ###### Exec-only header file ######
 set(EXTRA_HEADERS "include/gnuplot-iostream.h")
 
-###### Library src and headezr files (everything else) ######
+###### Library src and header files (everything else) ######
 file(GLOB LIB_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "src/*.c")
 list(REMOVE_ITEM LIB_SRCS ${MAIN_FILE})
 file(GLOB LIB_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "include/*.hpp")
@@ -73,7 +73,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib")
   subdirlist(LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
   foreach(subdir ${LIBS})
     #git submodules init
-    execute_process(COMMAND git submodule update --init -- "lib/${subdir}"
+    execute_process(COMMAND git submodule update --remote --merge --init -- "lib/${subdir}"
                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_subdirectory("lib/${subdir}")
     #get the version
