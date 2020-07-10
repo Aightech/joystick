@@ -35,6 +35,7 @@ cJoystick::~cJoystick() {
 
 void* cJoystick::loop(void *obj) {
 	while (reinterpret_cast<cJoystick *>(obj)->active) reinterpret_cast<cJoystick *>(obj)->readEv();
+	return nullptr;
 }
 
 void cJoystick::readEv() {
