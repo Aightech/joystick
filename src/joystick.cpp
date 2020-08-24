@@ -1,4 +1,5 @@
 #include "joystick.h"
+#include <string.h>
 
 cJoystick::cJoystick() {
 	active = false;
@@ -20,6 +21,59 @@ cJoystick::cJoystick() {
 		active = true;
 		pthread_create(&thread, 0, &cJoystick::loop, this);
 	}
+
+    event_fd = open(EVENT_DEV, O_RDWR);
+    if (event_fd > 0)
+    {
+        ioctl(event_fd, EVIOCGNAME(sizeof(name)), name);
+        std::cout << "Force feedback Device." << std::endl;
+        std::cout << "Device " << name << " opened\n";
+
+        /* Set master gain to 100% if supported */
+        memset(&gain, 0, sizeof(gain));
+        gain.type = EV_FF;
+        gain.code = FF_GAIN;
+        gain.value = 0xFFFF; /* [0, 0xFFFF]) */
+        write(event_fd, &gain, sizeof(gain));
+
+        /* pulse Left rumbling effect */
+        effects[0].type = FF_RUMBLE;
+        effects[0].id = -1;
+        effects[0].u.rumble.strong_magnitude = 0xffff;
+        effects[0].u.rumble.weak_magnitude = 0;
+        effects[0].replay.length = 200;
+        effects[0].replay.delay = 0;
+        ioctl(event_fd, EVIOCSFF, &effects[0]);
+
+        /* pulse right rumbling effect */
+        effects[1].type = FF_RUMBLE;
+        effects[1].id = -1;
+        effects[1].u.rumble.strong_magnitude = 0;
+        effects[1].u.rumble.weak_magnitude = 0xffff;
+        effects[1].replay.length = 200;
+        effects[1].replay.delay = 0;
+        ioctl(event_fd, EVIOCSFF, &effects[1]);
+
+        /* long Left rumbling effect */
+        effects[2].type = FF_RUMBLE;
+        effects[2].id = -1;
+        effects[2].u.rumble.strong_magnitude = 0xffff;
+        effects[2].u.rumble.weak_magnitude = 0;
+        effects[2].replay.length = 60000;
+        effects[2].replay.delay = 0;
+        ioctl(event_fd, EVIOCSFF, &effects[2]);
+
+        /* long right rumbling effect */
+        effects[3].type = FF_RUMBLE;
+        effects[3].id = -1;
+        effects[3].u.rumble.strong_magnitude = 0;
+        effects[3].u.rumble.weak_magnitude = 0xffff;
+        effects[3].replay.length = 60000;
+        effects[3].replay.delay = 0;
+        ioctl(event_fd, EVIOCSFF, &effects[3]);
+
+    }
+
 }
 
 cJoystick::~cJoystick() {
@@ -79,4 +133,61 @@ int cJoystick::joystickValue(int n) {
 
 bool cJoystick::buttonPressed(int n) {
 	return n > -1 && n < buttons ? joystick_st->button[n] : 0;
+}
+
+void cJoystick::pulse()
+{
+    leftPulse();
+    rightPulse();
+}
+
+void cJoystick::rumbleON()
+{
+    leftON();
+    rightON();
+}
+
+void cJoystick::rumbleOFF()
+{
+    leftOFF();
+    rightOFF();
+}
+
+void cJoystick::leftPulse()
+{
+    play_f(effects[0].id,1);
+}
+
+void cJoystick::rightPulse()
+{
+    play_f(effects[1].id,1);
+}
+
+void cJoystick::leftON()
+{
+    play_f(effects[2].id,1);
+}
+
+void cJoystick::leftOFF()
+{
+    play_f(effects[2].id,0);
+}
+
+void cJoystick::rightON()
+{
+    play_f(effects[3].id,1);
+}
+
+void cJoystick::rightOFF()
+{
+    play_f(effects[3].id,0);
+}
+
+void cJoystick::play_f(__u16 code, __s32 value)
+{
+    memset(&play,0,sizeof(play));
+    play.type = EV_FF;
+    play.code = code;
+    play.value = value;
+    write(event_fd, (const void*) &play, sizeof(play));
 }

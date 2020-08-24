@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #define JOYSTICK_DEV "/dev/input/js0"
+#define EVENT_DEV "/dev/input/event14"
 
 struct joystick_position {
 	float theta, r, x, y;
@@ -25,6 +26,11 @@ class cJoystick {
 	pthread_t thread;
 	bool active;
 	int joystick_fd;
+
+    int event_fd;
+    struct ff_effect effects[4];
+    struct input_event play, gain;
+
 	js_event *joystick_ev;
 	joystick_state *joystick_st;
 	__u32 version;
@@ -32,7 +38,8 @@ class cJoystick {
 	__u8 buttons;
 	char name[256];
 
-  protected:
+    void play_f(__u16 code, __s32 value);
+protected:
   public:
 	cJoystick();
 	~cJoystick();
@@ -40,7 +47,16 @@ class cJoystick {
 	void readEv();
 	joystick_position joystickPosition(int n);
 	int joystickValue(int n);
-        bool buttonPressed(int n);
+    bool buttonPressed(int n);
+    void leftPulse();
+    void leftON();
+    void leftOFF();
+    void rightPulse();
+    void rightON();
+    void rightOFF();
+    void pulse();
+    void rumbleON();
+    void rumbleOFF();
 };
 
 #endif
