@@ -37,6 +37,7 @@ class cJoystick {
 	__u32 version;
 	__u8 axes;
 	__u8 buttons;
+        
 	char name[256];
 
     void play_f(__u16 code, __s32 value);
@@ -49,6 +50,7 @@ protected:
 	joystick_position joystickPosition(int n);
 	int joystickValue(int n);
     bool buttonPressed(int n);
+    uint32_t button_bytes();
     void leftPulse();
     void leftON();
     void leftOFF();

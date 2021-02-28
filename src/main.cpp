@@ -5,5 +5,5 @@ int main()
   
   cJoystick js;
   for(;;)
-    std::cout << js.joystickValue(1) << "            \xd" << std::flush;
+    std::cout << js.joystickValue(7) << "            \xd" << std::flush;
 }

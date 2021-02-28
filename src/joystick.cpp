@@ -103,7 +103,7 @@ void cJoystick::readEv() {
 			  joystick_st->btn_b |=  1<<joystick_ev->number;
 			else
 			  joystick_st->btn_b &=  ~(1<<joystick_ev->number);
-		       //std::cout << "Buttons n° " << (int)joystick_ev->number << " :" << joystick_st->button[joystick_ev->number] << std::endl;
+			//std::cout << "Buttons n° " << joystick_st->btn_b << " :" << joystick_st->button[joystick_ev->number] << std::endl;
 		}
 		if (joystick_ev->type & JS_EVENT_AXIS) {
 			joystick_st->axis[joystick_ev->number] = joystick_ev->value;
@@ -138,6 +138,10 @@ int cJoystick::joystickValue(int n) {
 
 bool cJoystick::buttonPressed(int n) {
 	return n > -1 && n < buttons ? joystick_st->button[n] : 0;
+}
+
+uint32_t cJoystick::button_bytes() {
+	return joystick_st->btn_b;
 }
 
 void cJoystick::pulse()
