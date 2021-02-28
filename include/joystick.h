@@ -18,6 +18,7 @@ struct joystick_position {
 
 struct joystick_state {
 	std::vector<signed short> button;
+        __u32 btn_b;
 	std::vector<signed short> axis;
 };
 

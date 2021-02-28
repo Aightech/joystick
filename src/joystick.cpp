@@ -18,6 +18,7 @@ cJoystick::cJoystick() {
 		std::cout << "Buttons: " << (int)buttons << std::endl;
 		joystick_st->axis.reserve(axes);
 		joystick_st->button.reserve(buttons);
+		joystick_st->btn_b = 0;
 		active = true;
 		pthread_create(&thread, 0, &cJoystick::loop, this);
 	}
@@ -98,6 +99,10 @@ void cJoystick::readEv() {
 		joystick_ev->type &= ~JS_EVENT_INIT;
 		if (joystick_ev->type & JS_EVENT_BUTTON) {
 			joystick_st->button[joystick_ev->number] = joystick_ev->value;
+			if(joystick_ev->value)
+			  joystick_st->btn_b |=  1<<joystick_ev->number;
+			else
+			  joystick_st->btn_b &=  ~(1<<joystick_ev->number);
 		       //std::cout << "Buttons n° " << (int)joystick_ev->number << " :" << joystick_st->button[joystick_ev->number] << std::endl;
 		}
 		if (joystick_ev->type & JS_EVENT_AXIS) {
