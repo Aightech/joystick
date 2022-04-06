@@ -107,7 +107,7 @@ void cJoystick::readEv() {
 		}
 		if (joystick_ev->type & JS_EVENT_AXIS) {
 			joystick_st->axis[joystick_ev->number] = joystick_ev->value;
-		       //std::cout << "Axis n° " << (int)joystick_ev->number << " :" << joystick_st->axis[joystick_ev->number] << std::endl;
+			//std::cout << "Axis n° " << (int)joystick_ev->number << " :" << joystick_st->axis[joystick_ev->number] << std::endl;
 		}
 	}
 }
