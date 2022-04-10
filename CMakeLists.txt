@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.3)
 ###### Author: Alexis Devillard
-###### Date:   27/01/2020
+###### Date:   27/04/2022
 ###### Brief: This CmakeLists.txt file enable to build generic project with the following structure:
 ######                                +---------+
 ######                                | project |
@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 3.0)
 
 ###### PROJECT NAME AND VERSION ######
 set(EXEC_NAME joystick)
-set(PROJECT_VERSION 10-dca08cd)
+set(PROJECT_VERSION 1.3)
 project(${EXEC_NAME} VERSION ${PROJECT_VERSION})
 
 ###### LIBRARY NAME ######
@@ -41,12 +41,42 @@ set(LIB_NAME ${EXEC_NAME}.${PROJECT_VERSION})
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-###### Special libraries  ######
-if(YES)
-  set(EXTRA_LIBS "pthread")
+###### Special libraries ######
+if(1)
+  set(EXTRA_LIBS "pthread" "util")
 endif()
 
+###### Boost libraries ######
+if(0)
+  find_package(Boost 1.56 REQUIRED COMPONENTS system filesystem iostreams)
+  if (Boost_FOUND)
+    list(APPEND EXTRA_LIBS ${Boost_IOSTREAMS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
+  else ()
+    message("Couldn't find Boost library")
+  endif (Boost_FOUND)
+endif()
 
+###### SFML libraries ######
+if(0)
+  find_package(SFML REQUIRED COMPONENTS graphics window system)
+  if (SFML_FOUND)
+    list(APPEND EXTRA_LIBS "sfml-graphics" "sfml-window" "sfml-system")
+  else ()
+    message("Couldn't find SFML library")
+  endif (SFML_FOUND)
+endif()
+
+###### OpenCV libraries ######
+if(0)
+  find_package(OpenCV REQUIRED)
+  if (OpenCV_FOUND)
+    list(APPEND EXTRA_LIBS ${OpenCV_LIBS})
+    list(APPEND EXTRA_INCLUDES ${OpenCV_INCLUDE_DIRS})
+    message("-- Opencv library Found")
+  else ()
+    message("Couldn't find Opencv library")
+  endif (OpenCV_FOUND)
+endif()
 
 ###### Get the sources and headers ######
 ###### Exec main src file ######
@@ -54,36 +84,63 @@ set(MAIN_FILE "src/main.cpp")
 ###### Exec-only header file ######
 set(EXTRA_HEADERS "include/gnuplot-iostream.h")
 
-###### Library src and header files (everything else) ######
+###### Library src and headezr files (everything else) ######
 file(GLOB LIB_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "src/*.c")
 list(REMOVE_ITEM LIB_SRCS ${MAIN_FILE})
 file(GLOB LIB_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "include/*.hpp")
 list(REMOVE_ITEM LIB_HEADERS ${EXTRA_HEADERS})
 
 
+###### check for internet ######
+if(NOT DEFINED NO_CONNECTION)
+  execute_process(COMMAND printf "-- Check internet connection: ...\\b\\b\\b")
+  execute_process(
+    COMMAND ping www.google.com -c 2 -w 1 
+    ERROR_QUIET
+    OUTPUT_QUIET
+    RESULT_VARIABLE NO_CONNECTION
+    )
+  if(NO_CONNECTION EQUAL 1)
+    message(" Online")
+  else()
+    message(" Offline")
+  endif()
+endif()
 
-
+if(NOT DEFINED DIR_DEPTH)
+  set(DIR_DEPTH 0)
+else ()
+  MATH(EXPR DIR_DEPTH "${DIR_DEPTH}+1")
+endif()
+string(REPEAT "\t" ${DIR_DEPTH} PREFIX_MSG)
 
 ###### include helper functions ######
 include(CMakeFunctions.txt)
 
-
 ###### Search for Subdirectories/Libraries ######
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib") 
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib")
+  execute_process(COMMAND git submodule status
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE SUBMODULES_LIST)
   subdirlist(LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/")
   foreach(subdir ${LIBS})
-    #git submodules init
-    execute_process(COMMAND git submodule update --remote --merge --init -- "lib/${subdir}"
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    string(FIND "${SUBMODULES_LIST}" "${subdir}" FOUND)
+    if(${FOUND} GREATER -1 AND NO_CONNECTION EQUAL 1 )
+      #git submodules init
+      execute_process(COMMAND git submodule update --remote --merge --init -- "lib/${subdir}"
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
+    endif()
+    subproject_version("${subdir}" subdir_version)#get the version
+    message("${PREFIX_MSG}-- ${EXEC_NAME}: Adding library ${subdir} version: ${subdir_version}")
     add_subdirectory("lib/${subdir}")
-    #get the version
-    subproject_version("${subdir}" subdir_version)
-    message("-- ${EXEC_NAME}: Added library ${subdir} version: ${subdir_version}")
-    list(APPEND EXTRA_LIBS "${subdir}.${subdir_version}")
+    
+    get_directory_property(libname
+      DIRECTORY "lib/${subdir}"
+      DEFINITION LIB_NAME)
+    list(APPEND EXTRA_LIBS "${libname}")
+    link_directories(${CMAKE_SOURCE_DIR}/lib/${subdir}/bin)    
   endforeach()
 endif()
-
-
 
 
 ###### Create the library ######
@@ -91,7 +148,8 @@ add_library(${LIB_NAME} ${LIB_SRCS})
 target_link_libraries (${LIB_NAME}
   PUBLIC ${EXTRA_LIBS})
 target_include_directories(${LIB_NAME}
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
 
 
 
@@ -105,15 +163,13 @@ target_include_directories(${EXEC_NAME}
 
 
 
- 
 ###### Instalation rule ######
 install(TARGETS ${EXEC_NAME} DESTINATION bin)
-install(TARGETS ${LIB_NAME} DESTINATION lib)
+install(TARGETS ${LIB_NAME} DESTINATION bin)
 install(FILES ${HEADERS} DESTINATION include)
 
 
 # enable_testing()
-
 # # define a function to simplify adding tests
 # function(do_test target arg result)
 #   add_test(NAME Comp${arg} COMMAND ${target} ${arg})
@@ -121,7 +177,6 @@ install(FILES ${HEADERS} DESTINATION include)
 #     PROPERTIES PASS_REGULAR_EXPRESSION ${result}
 #     )
 # endfunction(do_test)
-
 # # do a bunch of result based tests
 # do_test(canopen 1 1000 0 "")
 # do_test(canopen 2 607A 0 4 d 1000 "")
