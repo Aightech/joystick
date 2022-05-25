@@ -3,6 +3,7 @@
 
 #include <fcntl.h>
 #include <iostream>
+#include <cstdint>
 #include <linux/joystick.h>
 #include <math.h>
 #include <pthread.h>

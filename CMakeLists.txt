@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 3.3)
 
 ###### PROJECT NAME AND VERSION ######
 set(EXEC_NAME joystick)
-set(PROJECT_VERSION 1.12)
+set(PROJECT_VERSION 2.1)
 project(${EXEC_NAME} VERSION ${PROJECT_VERSION})
 
 ###### LIBRARY NAME ######
@@ -61,8 +61,9 @@ else ()
   set(CMAKE_CXX_STANDARD_REQUIRED True)
 
   ###### Special libraries ######
-  if(1)
-    set(EXTRA_LIBS "pthread" "util")
+  set(EXTRA_LIBS "")
+  if(0)
+    set(EXTRA_LIBS "pthread")
   endif()
 
   ###### Boost libraries ######
