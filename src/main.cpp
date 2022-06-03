@@ -3,8 +3,18 @@
 
 int main()
 {
-  
+    
   cJoystick js;
+try
+  {
+    js.connect("/dev/input/js0","");
+  }
+ catch(std::string err)
+   {
+    std::cout <<err<<std::endl;
+   
+   }
+  
   std::cout <<"|";
   for(int i =0; i<js.getNbButtons(); i++)
     std::cout << ((i>=10)?"":" ") << i << "|";

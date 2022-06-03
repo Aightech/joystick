@@ -1,148 +1,203 @@
 #include "joystick.h"
+#include <strANSIseq.hpp>
 #include <string.h>
 
-cJoystick::cJoystick() {
-	active = false;
-	joystick_fd = 0;
-	joystick_ev = new js_event();
-	joystick_st = new joystick_state();
-	joystick_fd = open(JOYSTICK_DEV, O_RDONLY | O_NONBLOCK);
-	if (joystick_fd > 0) {
-		ioctl(joystick_fd, JSIOCGNAME(256), name);
-		ioctl(joystick_fd, JSIOCGVERSION, &version);
-		ioctl(joystick_fd, JSIOCGAXES, &axes);
-		ioctl(joystick_fd, JSIOCGBUTTONS, &buttons);
-		std::cout << "   Name: " << name << std::endl;
-		std::cout << "Version: " << version << std::endl;
-		std::cout << "   Axes: " << (int)axes << std::endl;
-		std::cout << "Buttons: " << (int)buttons << std::endl;
-		joystick_st->axis.reserve(axes);
-		joystick_st->button.reserve(buttons);
-		joystick_st->btn_b = 0;
-		active = true;
-		pthread_create(&thread, 0, &cJoystick::loop, this);
-	}
+#define LOG(...)             \
+    if(m_verbose)            \
+    {                        \
+        printf(__VA_ARGS__); \
+        fflush(stdout);      \
+    }
+using namespace ESC;
 
-    event_fd = open(EVENT_DEV, O_RDWR);
-    if (event_fd > 0)
+void cJoystick::connect(const char *dev_path, const char *ev_path)
+{
+    m_active = false;
+    m_joystick_fd = 0;
+    m_joystick_ev = new js_event();
+    m_joystick_st = new joystick_state();
+    m_joystick_fd = open(dev_path, O_RDONLY | O_NONBLOCK);
+    if(m_joystick_fd > 0)
     {
-        ioctl(event_fd, EVIOCGNAME(sizeof(name)), name);
-        std::cout << "Force feedback Device." << std::endl;
-        std::cout << "Device " << name << " opened\n";
+
+        ioctl(m_joystick_fd, JSIOCGNAME(256), m_name);
+        ioctl(m_joystick_fd, JSIOCGVERSION, &m_version);
+        ioctl(m_joystick_fd, JSIOCGAXES, &m_axes);
+        ioctl(m_joystick_fd, JSIOCGBUTTONS, &m_buttons);
+        //ESC::format(
+        LOG("%s", fstr("[JOYSTICK]", {BOLD, FG_CYAN}).c_str());
+        LOG("\t%s %s\n", fstr("Name:", {UNDERLINE}).c_str(),
+            fstr(m_name, {BOLD}).c_str());
+        LOG("\t\t%s %s\n", fstr("Path:", {UNDERLINE}).c_str(),
+            fstr(dev_path, {BOLD}).c_str());
+        LOG("\t\t%s %s\n", fstr("Version:", {UNDERLINE}).c_str(),
+            fstr(std::to_string(m_version), {BOLD}).c_str());
+        LOG("\t\t%s %s\n", fstr("Axes:", {UNDERLINE}).c_str(),
+            fstr(std::to_string((int)m_axes), {BOLD}).c_str());
+        LOG("\t\t%s %s\n", fstr("Buttons:", {UNDERLINE}).c_str(),
+            fstr(std::to_string((int)m_buttons), {BOLD}).c_str());
+        m_joystick_st->axis.reserve(m_axes);
+        m_joystick_st->button.reserve(m_buttons);
+        m_joystick_st->btn_b = 0;
+        m_active = true;
+        pthread_create(&m_thread, 0, &cJoystick::loop, this);
+    }
+    else
+        throw std::string("No joystick found at ") + dev_path;
+
+    std::string event_path(ev_path);
+    if(event_path == std::string(""))//search for associated joystick event
+    {
+        for(int i = 0; i < 40; i++)
+        {
+            event_path = "/dev/input/event" + std::to_string(i);
+            m_event_fd = open(event_path.c_str(), O_RDWR);
+            if(m_event_fd > 0)
+            {
+                char test[256];
+                ioctl(m_event_fd, EVIOCGNAME(sizeof(test)), test);
+                if(std::string(m_name) == std::string(test))
+                    break;
+                close(m_event_fd);
+            }
+        }
+    }
+    
+    m_event_fd = open(event_path.c_str(), O_RDWR);
+    if(m_event_fd > 0)
+    {
+        char test[256];
+        ioctl(m_event_fd, EVIOCGNAME(sizeof(test)), test);
+        LOG("\t\t%s %s\n", fstr("Force feedback:", {UNDERLINE}).c_str(),
+            fstr(event_path, {BOLD}).c_str());
 
         /* Set master gain to 100% if supported */
-        memset(&gain, 0, sizeof(gain));
-        gain.type = EV_FF;
-        gain.code = FF_GAIN;
-        gain.value = 0xFFFF; /* [0, 0xFFFF]) */
-        write(event_fd, &gain, sizeof(gain));
+        memset(&m_gain, 0, sizeof(m_gain));
+        m_gain.type = EV_FF;
+        m_gain.code = FF_GAIN;
+        m_gain.value = 0xFFFF; /* [0, 0xFFFF]) */
+        write(m_event_fd, &m_gain, sizeof(m_gain));
 
         /* pulse Left rumbling effect */
-        effects[0].type = FF_RUMBLE;
-        effects[0].id = -1;
-        effects[0].u.rumble.strong_magnitude = 0xffff;
-        effects[0].u.rumble.weak_magnitude = 0;
-        effects[0].replay.length = 200;
-        effects[0].replay.delay = 0;
-        ioctl(event_fd, EVIOCSFF, &effects[0]);
+        m_effects[0].type = FF_RUMBLE;
+        m_effects[0].id = -1;
+        m_effects[0].u.rumble.strong_magnitude = 0xffff;
+        m_effects[0].u.rumble.weak_magnitude = 0;
+        m_effects[0].replay.length = 200;
+        m_effects[0].replay.delay = 0;
+        ioctl(m_event_fd, EVIOCSFF, &m_effects[0]);
 
         /* pulse right rumbling effect */
-        effects[1].type = FF_RUMBLE;
-        effects[1].id = -1;
-        effects[1].u.rumble.strong_magnitude = 0;
-        effects[1].u.rumble.weak_magnitude = 0xffff;
-        effects[1].replay.length = 200;
-        effects[1].replay.delay = 0;
-        ioctl(event_fd, EVIOCSFF, &effects[1]);
+        m_effects[1].type = FF_RUMBLE;
+        m_effects[1].id = -1;
+        m_effects[1].u.rumble.strong_magnitude = 0;
+        m_effects[1].u.rumble.weak_magnitude = 0xffff;
+        m_effects[1].replay.length = 200;
+        m_effects[1].replay.delay = 0;
+        ioctl(m_event_fd, EVIOCSFF, &m_effects[1]);
 
         /* long Left rumbling effect */
-        effects[2].type = FF_RUMBLE;
-        effects[2].id = -1;
-        effects[2].u.rumble.strong_magnitude = 0xffff;
-        effects[2].u.rumble.weak_magnitude = 0;
-        effects[2].replay.length = 60000;
-        effects[2].replay.delay = 0;
-        ioctl(event_fd, EVIOCSFF, &effects[2]);
+        m_effects[2].type = FF_RUMBLE;
+        m_effects[2].id = -1;
+        m_effects[2].u.rumble.strong_magnitude = 0xffff;
+        m_effects[2].u.rumble.weak_magnitude = 0;
+        m_effects[2].replay.length = 60000;
+        m_effects[2].replay.delay = 0;
+        ioctl(m_event_fd, EVIOCSFF, &m_effects[2]);
 
         /* long right rumbling effect */
-        effects[3].type = FF_RUMBLE;
-        effects[3].id = -1;
-        effects[3].u.rumble.strong_magnitude = 0;
-        effects[3].u.rumble.weak_magnitude = 0xffff;
-        effects[3].replay.length = 60000;
-        effects[3].replay.delay = 0;
-        ioctl(event_fd, EVIOCSFF, &effects[3]);
-
+        m_effects[3].type = FF_RUMBLE;
+        m_effects[3].id = -1;
+        m_effects[3].u.rumble.strong_magnitude = 0;
+        m_effects[3].u.rumble.weak_magnitude = 0xffff;
+        m_effects[3].replay.length = 60000;
+        m_effects[3].replay.delay = 0;
+        ioctl(m_event_fd, EVIOCSFF, &m_effects[3]);
     }
-
+    else
+        throw std::string("No joystick event found at ") + ev_path;
 }
 
-cJoystick::~cJoystick() {
-	if (joystick_fd > 0) {
-		active = false;
-		pthread_join(thread, 0);
-		close(joystick_fd);
-	}
-	delete joystick_st;
-	delete joystick_ev;
-	joystick_fd = 0;
+cJoystick::~cJoystick()
+{
+    if(m_joystick_fd > 0)
+    {
+        m_active = false;
+        pthread_join(m_thread, 0);
+        close(m_joystick_fd);
+    }
+    delete m_joystick_st;
+    delete m_joystick_ev;
+    m_joystick_fd = 0;
 }
 
-void* cJoystick::loop(void *obj) {
-	while (reinterpret_cast<cJoystick *>(obj)->active) reinterpret_cast<cJoystick *>(obj)->readEv();
-	return nullptr;
+void *cJoystick::loop(void *obj)
+{
+    while(reinterpret_cast<cJoystick *>(obj)->m_active)
+        reinterpret_cast<cJoystick *>(obj)->readEv();
+    return nullptr;
 }
 
-void cJoystick::readEv() {
-	int bytes = read(joystick_fd, joystick_ev, sizeof(*joystick_ev));
-	if (bytes > 0) {
-		joystick_ev->type &= ~JS_EVENT_INIT;
-		if (joystick_ev->type & JS_EVENT_BUTTON) {
-			joystick_st->button[joystick_ev->number] = joystick_ev->value;
-			if(joystick_ev->value)
-			  joystick_st->btn_b |=  1<<joystick_ev->number;
-			else
-			  joystick_st->btn_b &=  ~(1<<joystick_ev->number);
-			//std::cout << "Buttons n° " << joystick_st->btn_b << " :" << joystick_st->button[joystick_ev->number] << std::endl;
-		}
-		if (joystick_ev->type & JS_EVENT_AXIS) {
-			joystick_st->axis[joystick_ev->number] = joystick_ev->value;
-			//std::cout << "Axis n° " << (int)joystick_ev->number << " :" << joystick_st->axis[joystick_ev->number] << std::endl;
-		}
-	}
+void cJoystick::readEv()
+{
+    int bytes = read(m_joystick_fd, m_joystick_ev, sizeof(*m_joystick_ev));
+    if(bytes > 0)
+    {
+        m_joystick_ev->type &= ~JS_EVENT_INIT;
+        if(m_joystick_ev->type & JS_EVENT_BUTTON)
+        {
+            m_joystick_st->button[m_joystick_ev->number] = m_joystick_ev->value;
+            if(m_joystick_ev->value)
+                m_joystick_st->btn_b |= 1 << m_joystick_ev->number;
+            else
+                m_joystick_st->btn_b &= ~(1 << m_joystick_ev->number);
+            //std::cout << "Buttons n° " << joystick_st->btn_b << " :" << joystick_st->button[joystick_ev->number] << std::endl;
+        }
+        if(m_joystick_ev->type & JS_EVENT_AXIS)
+        {
+            m_joystick_st->axis[m_joystick_ev->number] = m_joystick_ev->value;
+            //std::cout << "Axis n° " << (int)joystick_ev->number << " :" << joystick_st->axis[joystick_ev->number] << std::endl;
+        }
+    }
 }
 
-joystick_position cJoystick::joystickPosition(int n) {
-	joystick_position pos;
+joystick_position cJoystick::joystickPosition(int n)
+{
+    joystick_position pos;
 
-	if (n > -1 && n < axes) {
-		int i0 = n*2, i1 = n*2+1;
-		float x0 = joystick_st->axis[i0]/32767.0f, y0 = -joystick_st->axis[i1]/32767.0f;
-		float x  = x0 * sqrt(1 - pow(y0, 2)/2.0f), y  = y0 * sqrt(1 - pow(x0, 2)/2.0f);
+    if(n > -1 && n < m_axes)
+    {
+        int i0 = n * 2, i1 = n * 2 + 1;
+        float x0 = m_joystick_st->axis[i0] / 32767.0f,
+              y0 = -m_joystick_st->axis[i1] / 32767.0f;
+        float x = x0 * sqrt(1 - pow(y0, 2) / 2.0f),
+              y = y0 * sqrt(1 - pow(x0, 2) / 2.0f);
 
-		pos.x = x0;
-		pos.y = y0;
-		
-		pos.theta = atan2(y, x);
-		pos.r = sqrt(pow(y, 2) + pow(x, 2));
-	} else {
-		pos.theta = pos.r = pos.x = pos.y = 0.0f;
-	}
-	return pos;
+        pos.x = x0;
+        pos.y = y0;
+
+        pos.theta = atan2(y, x);
+        pos.r = sqrt(pow(y, 2) + pow(x, 2));
+    }
+    else
+    {
+        pos.theta = pos.r = pos.x = pos.y = 0.0f;
+    }
+    return pos;
 }
 
-int cJoystick::joystickValue(int n) {
+int16_t cJoystick::joystickValue(int n)
+{
 
-	return n > -1 && n < axes ? joystick_st->axis[n] : 0;
+    return n > -1 && n < m_axes ? m_joystick_st->axis[n] : 0;
 }
 
-bool cJoystick::buttonPressed(int n) {
-	return n > -1 && n < buttons ? joystick_st->button[n] : 0;
+bool cJoystick::buttonPressed(int n)
+{
+    return n > -1 && n < m_buttons ? m_joystick_st->button[n] : 0;
 }
 
-uint32_t cJoystick::button_bytes() {
-	return joystick_st->btn_b;
-}
+uint32_t cJoystick::button_bytes() { return m_joystick_st->btn_b; }
 
 void cJoystick::pulse()
 {
@@ -162,41 +217,23 @@ void cJoystick::rumbleOFF()
     rightOFF();
 }
 
-void cJoystick::leftPulse()
-{
-    play_f(effects[0].id,1);
-}
+void cJoystick::leftPulse() { play_f(m_effects[0].id, 1); }
 
-void cJoystick::rightPulse()
-{
-    play_f(effects[1].id,1);
-}
+void cJoystick::rightPulse() { play_f(m_effects[1].id, 1); }
 
-void cJoystick::leftON()
-{
-    play_f(effects[2].id,1);
-}
+void cJoystick::leftON() { play_f(m_effects[2].id, 1); }
 
-void cJoystick::leftOFF()
-{
-    play_f(effects[2].id,0);
-}
+void cJoystick::leftOFF() { play_f(m_effects[2].id, 0); }
 
-void cJoystick::rightON()
-{
-    play_f(effects[3].id,1);
-}
+void cJoystick::rightON() { play_f(m_effects[3].id, 1); }
 
-void cJoystick::rightOFF()
-{
-    play_f(effects[3].id,0);
-}
+void cJoystick::rightOFF() { play_f(m_effects[3].id, 0); }
 
 void cJoystick::play_f(__u16 code, __s32 value)
 {
-    memset(&play,0,sizeof(play));
-    play.type = EV_FF;
-    play.code = code;
-    play.value = value;
-    write(event_fd, (const void*) &play, sizeof(play));
+    memset(&m_play, 0, sizeof(m_play));
+    m_play.type = EV_FF;
+    m_play.code = code;
+    m_play.value = value;
+    write(m_event_fd, (const void *)&m_play, sizeof(m_play));
 }
