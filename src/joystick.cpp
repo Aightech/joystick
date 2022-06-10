@@ -68,7 +68,7 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
     {
         char test[256];
         ioctl(m_event_fd, EVIOCGNAME(sizeof(test)), test);
-        LOG("\t\t%s %s\n", fstr("Force feedback:", {UNDERLINE}).c_str(),
+        LOG("\t\t%s %s\n\n", fstr("Force feedback:", {UNDERLINE}).c_str(),
             fstr(event_path, {BOLD}).c_str());
 
         /* Set master gain to 100% if supported */

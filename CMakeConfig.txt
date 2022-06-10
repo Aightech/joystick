@@ -1,10 +1,10 @@
 set(EXEC_NAME joystick)
-set(PROJECT_VERSION 2.3)
+set(PROJECT_VERSION 3.12)
 
 ###### Special libraries ######
 set(EXTRA_LIBS "")
 set(TOOL_LIBS "")		
-if(0)
+if(1)
   set(EXTRA_LIBS "pthread" "util")
 endif()
 
