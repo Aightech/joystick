@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <vector>
 
+#include <strANSIseq.hpp>
+#include <string.h>
+
 #define JOYSTICK_DEV "/dev/input/js0"
 #define EVENT_DEV ""
 
@@ -25,11 +28,12 @@ struct joystick_state
     std::vector<int16_t> axis;
 };
 
-class cJoystick
+class cJoystick : public ESC::CLI
 {
 
     public:
-    cJoystick(bool verbose = true) : m_verbose(verbose){};
+    cJoystick(int verbose = -1)
+        : m_verbose(verbose), CLI(verbose, "Joystick"){};
     ~cJoystick();
 
     void connect(const char *dev_path = JOYSTICK_DEV,
@@ -61,7 +65,9 @@ class cJoystick
     pthread_t m_thread;
     bool m_active;
     int m_joystick_fd;
-    bool m_verbose = true;
+    int m_verbose;
+    std::string m_verbose_id;
+    std::string m_verbose_indent;
 
     int m_event_fd;
     struct ff_effect m_effects[4];

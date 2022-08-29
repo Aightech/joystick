@@ -1,13 +1,5 @@
 #include "joystick.h"
-#include <strANSIseq.hpp>
-#include <string.h>
 
-#define LOG(...)             \
-    if(m_verbose)            \
-    {                        \
-        printf(__VA_ARGS__); \
-        fflush(stdout);      \
-    }
 using namespace ESC;
 
 void cJoystick::connect(const char *dev_path, const char *ev_path)
@@ -24,18 +16,11 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
         ioctl(m_joystick_fd, JSIOCGVERSION, &m_version);
         ioctl(m_joystick_fd, JSIOCGAXES, &m_axes);
         ioctl(m_joystick_fd, JSIOCGBUTTONS, &m_buttons);
-        //ESC::format(
-        LOG("%s", fstr("[JOYSTICK]", {BOLD, FG_CYAN}).c_str());
-        LOG("\t%s %s\n", fstr("Name:", {UNDERLINE}).c_str(),
-            fstr(m_name, {BOLD}).c_str());
-        LOG("\t\t%s %s\n", fstr("Path:", {UNDERLINE}).c_str(),
-            fstr(dev_path, {BOLD}).c_str());
-        LOG("\t\t%s %s\n", fstr("Version:", {UNDERLINE}).c_str(),
-            fstr(std::to_string(m_version), {BOLD}).c_str());
-        LOG("\t\t%s %s\n", fstr("Axes:", {UNDERLINE}).c_str(),
-            fstr(std::to_string((int)m_axes), {BOLD}).c_str());
-        LOG("\t\t%s %s\n", fstr("Buttons:", {UNDERLINE}).c_str(),
-            fstr(std::to_string((int)m_buttons), {BOLD}).c_str());
+        logln(fstr("Name:", {UNDERLINE}) + fstr(m_name, {BOLD}), true);
+        logln(fstr("Path:", {UNDERLINE}) + fstr(dev_path, {BOLD}));
+        logln(fstr("Version:", {UNDERLINE}) + fstr_n(m_version, {BOLD}));
+        logln(fstr("Axes:", {UNDERLINE}).c_str() + fstr_n((int)m_axes, {BOLD}));
+        logln(fstr("Buttons:", {UNDERLINE}) + fstr_n((int)m_buttons, {BOLD}));
         m_joystick_st->axis.reserve(m_axes);
         m_joystick_st->button.reserve(m_buttons);
         m_joystick_st->btn_b = 0;
@@ -43,10 +28,10 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
         pthread_create(&m_thread, 0, &cJoystick::loop, this);
     }
     else
-        throw std::string("No joystick found at ") + dev_path;
+        throw log_error(std::string("No joystick found at ") + dev_path);
 
     std::string event_path(ev_path);
-    if(event_path == std::string(""))//search for associated joystick event
+    if(event_path == std::string("")) //search for associated joystick event
     {
         for(int i = 0; i < 40; i++)
         {
@@ -62,14 +47,13 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
             }
         }
     }
-    
+
     m_event_fd = open(event_path.c_str(), O_RDWR);
     if(m_event_fd > 0)
     {
         char test[256];
         ioctl(m_event_fd, EVIOCGNAME(sizeof(test)), test);
-        LOG("\t\t%s %s\n\n", fstr("Force feedback:", {UNDERLINE}).c_str(),
-            fstr(event_path, {BOLD}).c_str());
+        logln(fstr("Force feedback:", {UNDERLINE}) + fstr(event_path, {BOLD}));
 
         /* Set master gain to 100% if supported */
         memset(&m_gain, 0, sizeof(m_gain));
@@ -115,7 +99,7 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
         ioctl(m_event_fd, EVIOCSFF, &m_effects[3]);
     }
     else
-        throw std::string("No joystick event found at ") + ev_path;
+        throw log_error(std::string("No joystick event found at ") + ev_path);
 }
 
 cJoystick::~cJoystick()
