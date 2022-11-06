@@ -1,5 +1,5 @@
 set(EXEC_NAME joystick)
-set(PROJECT_VERSION 3.13)
+set(PROJECT_VERSION 3.16)
 
 ###### Special libraries ######
 set(EXTRA_LIBS "")
