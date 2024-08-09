@@ -1,4 +1,4 @@
 [submodule "lib/strANSIseq"]
 	path = lib/strANSIseq
-	url = git@github.com:Aightech/strANSIseq
+	url = ../strANSIseq
 	branch = main
