@@ -33,7 +33,7 @@ class cJoystick : public ESC::CLI
 
     public:
     cJoystick(int verbose = -1)
-        : m_verbose(verbose), CLI(verbose, "Joystick"){};
+        : CLI(verbose, "Joystick"),m_verbose(verbose){};
     ~cJoystick();
 
     void connect(const char *dev_path = JOYSTICK_DEV,
