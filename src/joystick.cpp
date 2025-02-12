@@ -60,7 +60,8 @@ void cJoystick::connect(const char *dev_path, const char *ev_path)
         m_gain.type = EV_FF;
         m_gain.code = FF_GAIN;
         m_gain.value = 0xFFFF; /* [0, 0xFFFF]) */
-        write(m_event_fd, &m_gain, sizeof(m_gain));
+        ssize_t n = write(m_event_fd, &m_gain, sizeof(m_gain));
+        (void)n;
 
         /* pulse Left rumbling effect */
         m_effects[0].type = FF_RUMBLE;
@@ -219,5 +220,6 @@ void cJoystick::play_f(__u16 code, __s32 value)
     m_play.type = EV_FF;
     m_play.code = code;
     m_play.value = value;
-    write(m_event_fd, (const void *)&m_play, sizeof(m_play));
+    ssize_t n = write(m_event_fd, (const void *)&m_play, sizeof(m_play));
+    (void)n;
 }
